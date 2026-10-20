@@ -1,0 +1,15 @@
+# Compiled Java files
+out/
+*.class
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# Personal expense and budget data
+data/
+*.csv
+
+# Logs
+*.log
