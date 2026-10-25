@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Expense Tracker</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f4f7fb;color:#202b3c}
+header{background:#172554;color:white;padding:24px 5%;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+header h1{margin:0;font-size:25px}
+header p{margin:7px 0 0;color:#cbd5e1}
+main{max-width:1100px;margin:28px auto;padding:0 18px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+.card{background:white;padding:20px;border-radius:14px;box-shadow:0 3px 14px #1725540d;margin-bottom:18px}
+.stat-label{color:#64748b;font-size:14px}
+.amount{font-size:27px;font-weight:bold;margin-top:12px}
+h2{font-size:19px;margin-top:0}
+.layout{display:grid;grid-template-columns:1fr 1.4fr;gap:18px;margin-top:18px}
+label{display:block;font-size:13px;margin:12px 0 6px;color:#475569}
+input,select{width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;background:white}
+button{border:0;border-radius:8px;padding:11px 15px;background:#2563eb;color:white;cursor:pointer;font-weight:bold;margin-top:14px}
+button:hover{background:#1d4ed8}
+.secondary{background:#e2e8f0;color:#1e293b}
+.secondary:hover{background:#cbd5e1}
+.full{width:100%}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:12px 8px;border-bottom:1px solid #e2e8f0}
+th{color:#64748b;font-weight:600}
+.tag{background:#dbeafe;color:#1d4ed8;padding:5px 8px;border-radius:20px;font-size:12px}
+.delete{background:#fee2e2;color:#991b1b;padding:7px 9px;margin:0}
+.delete:hover{background:#fecaca}
+.progress{height:10px;background:#e2e8f0;border-radius:8px;overflow:hidden;margin:12px 0}
+.bar{height:100%;width:0;background:#2563eb}
+.muted{color:#64748b;font-size:13px}
+.empty{text-align:center;color:#64748b;padding:24px}
+footer{text-align:center;padding:25px;color:#64748b;font-size:13px}
+@media(max-width:720px){.layout{grid-template-columns:1fr}header h1{font-size:21px}table{font-size:12px}th,td{padding:9px 4px}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Smart Expense Tracker</h1>
+    <p>Track spending. Manage budgets. Save smarter.</p>
+  </div>
+  <span>Personal Finance Dashboard</span>
+</header>
+
+<main>
+  <section class="stats">
+    <div class="card"><div class="stat-label">Total Spent This Month</div><div class="amount" id="total">₹0</div></div>
+    <div class="card"><div class="stat-label">Monthly Budget</div><div class="amount" id="budgetLabel">₹20,000</div></div>
+    <div class="card"><div class="stat-label">Budget Remaining</div><div class="amount" id="remaining">₹20,000</div></div>
+  </section>
+
+  <section class="card">
+    <h2>Monthly Budget</h2>
+    <label for="budget">Set your budget (₹)</label>
+    <input id="budget" type="number" min="1" value="20000">
+    <button onclick="setBudget()">Update Budget</button>
+    <div class="progress"><div class="bar" id="bar"></div></div>
+    <p class="muted" id="budgetStatus">You are within your budget.</p>
+  </section>
+
+  <div class="layout">
+    <section class="card">
+      <h2>Add Expense</h2>
+      <form id="expenseForm">
+        <label for="amount">Amount (₹)</label>
+        <input id="amount" type="number" min="0.01" step="0.01" placeholder="e.g. 250" required>
+        <label for="category">Category</label>
+        <select id="category">
+          <option>FOOD</option><option>TRAVEL</option><option>SHOPPING</option>
+          <option>BILLS</option><option>ENTERTAINMENT</option><option>HEALTH</option>
+          <option>EDUCATION</option><option>OTHER</option>
+        </select>
+        <label for="type">Expense Type</label>
+        <select id="type"><option>NEED</option><option>WANT</option></select>
+        <label for="date">Date</label>
+        <input id="date" type="date" required>
+        <label for="description">Description</label>
+        <input id="description" maxlength="100" placeholder="e.g. Lunch at office" required>
+        <button class="full" type="submit">+ Add Expense</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Expense History</h2>
+      <label for="filter">Filter by category</label>
+      <select id="filter" onchange="render()">
+        <option value="ALL">All Categories</option>
+        <option>FOOD</option><option>TRAVEL</option><option>SHOPPING</option>
+        <option>BILLS</option><option>ENTERTAINMENT</option><option>HEALTH</option>
+        <option>EDUCATION</option><option>OTHER</option>
+      </select>
+      <div style="overflow-x:auto;margin-top:12px">
+        <table>
+          <thead><tr><th>Expense</th><th>Category</th><th>Amount</th><th></th></tr></thead>
+          <tbody id="expenseRows"></tbody>
+        </table>
+      </div>
+      <button class="secondary" onclick="exportCSV()">Export CSV Report</button>
+      <button class="secondary" onclick="clearExpenses()">Clear All</button>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Where Did My Money Go?</h2>
+    <div id="breakdown"><p class="empty">Add an expense to see your category breakdown.</p></div>
+  </section>
+</main>
+
+<footer>Smart Expense Tracker · Web Demo · Your data stays in this browser</footer>
+
+<script>
+const KEY = "smartExpenseTrackerWebDemo_v1";
+let expenses = [];
+let budgetAmount = 20000;
+
+try {
+  expenses = JSON.parse(localStorage.getItem(KEY) || "[]");
+  budgetAmount = Number(localStorage.getItem(KEY + "_budget") || 20000);
+  if (!Array.isArray(expenses)) expenses = [];
+  if (!Number.isFinite(budgetAmount) || budgetAmount <= 0) budgetAmount = 20000;
+} catch (e) {
+  expenses = [];
+}
+const money = n => "₹" + Number(n).toLocaleString("en-IN",{maximumFractionDigits:2});
+const today = new Date();
+document.getElementById("date").value =
+  today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
+document.getElementById("budget").value = budgetAmount;
+
+function save(){
+  localStorage.setItem(KEY, JSON.stringify(expenses));
+  localStorage.setItem(KEY+"_budget", String(budgetAmount));
+}
+function isThisMonth(e){
+  const d = new Date(e.date+"T12:00:00");
+  return d.getFullYear()===today.getFullYear() && d.getMonth()===today.getMonth();
+}
+document.getElementById("expenseForm").addEventListener("submit", function(event){
+  event.preventDefault();
+  const amount = Number(document.getElementById("amount").value);
+  const description = document.getElementById("description").value.trim();
+  const date = document.getElementById("date").value;
+  if(!Number.isFinite(amount)||amount<=0||!description||!date){
+    alert("Please enter valid expense details.");
+    return;
+  }
+  expenses.unshift({
+    id: Date.now().toString()+"_"+Math.random().toString(36).slice(2,7),
+    amount, category:document.getElementById("category").value,
+    type:document.getElementById("type").value,date,description
+  });
+  save();
+  this.reset();
+  document.getElementById("date").value =
+    today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
+  render();
+});
+function setBudget(){
+  const value = Number(document.getElementById("budget").value);
+  if(!Number.isFinite(value)||value<=0){alert("Enter a budget greater than zero.");return;}
+  budgetAmount=value;save();render();
+}
+function render(){
+  const monthly=expenses.filter(isThisMonth);
+  const spent=monthly.reduce((s,e)=>s+e.amount,0);
+  const remaining=budgetAmount-spent;
+  document.getElementById("total").textContent=money(spent);
+  document.getElementById("budgetLabel").textContent=money(budgetAmount);
+  document.getElementById("remaining").textContent=money(remaining);
+  document.getElementById("remaining").style.color=remaining<0?"#dc2626":"#202b3c";
+  const percent=spent/budgetAmount*100;
+  document.getElementById("bar").style.width=Math.min(percent,100)+"%";
+  document.getElementById("bar").style.background=percent>=100?"#dc2626":percent>=80?"#f59e0b":"#2563eb";
+  document.getElementById("budgetStatus").textContent=
+    percent>=100?"Budget exceeded by "+money(spent-budgetAmount)+" ("+percent.toFixed(0)+"% used).":
+    percent>=80?"Warning: "+percent.toFixed(0)+"% of your monthly budget used.":
+    percent.toFixed(0)+"% of your monthly budget used. You are within budget.";
+
+  const filter=document.getElementById("filter").value;
+  const visible=expenses.filter(e=>filter==="ALL"||e.category===filter);
+  const tbody=document.getElementById("expenseRows");
+  tbody.replaceChildren();
+  if(!visible.length){
+    const tr=document.createElement("tr"),td=document.createElement("td");
+    td.colSpan=4;td.className="empty";td.textContent="No expenses yet.";
+    tr.appendChild(td);tbody.appendChild(tr);
+  }else{
+    visible.forEach(e=>{
+      const tr=document.createElement("tr");
+      const desc=document.createElement("td");
+      desc.textContent=e.description+" ";
+      const small=document.createElement("div");small.className="muted";small.textContent=e.date+" · "+e.type;
+      desc.appendChild(small);
+      const cat=document.createElement("td");cat.textContent=e.category;
+      const amt=document.createElement("td");amt.textContent=money(e.amount);
+      const action=document.createElement("td");
+      const btn=document.createElement("button");btn.className="delete";btn.textContent="Delete";
+      btn.onclick=()=>deleteExpense(e.id);
+      action.appendChild(btn);tr.append(desc,cat,amt,action);tbody.appendChild(tr);
+    });
+  }
+  const totals={};
+  monthly.forEach(e=>totals[e.category]=(totals[e.category]||0)+e.amount);
+  const breakdown=document.getElementById("breakdown");
+  breakdown.replaceChildren();
+  const entries=Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  if(!entries.length){
+    const p=document.createElement("p");p.className="empty";p.textContent="No expenses this month yet.";breakdown.appendChild(p);
+  }else{
+    entries.forEach(([category,total])=>{
+      const row=document.createElement("div");row.style.margin="14px 0";
+      const line=document.createElement("div");line.style.display="flex";line.style.justifyContent="space-between";line.style.gap="10px";
+      const name=document.createElement("span");name.textContent=category;
+      const amount=document.createElement("strong");amount.textContent=money(total);
+      line.append(name,amount);
+      const progress=document.createElement("div");progress.className="progress";
+      const fill=document.createElement("div");fill.className="bar";
+      fill.style.width=(spent?total/spent*100:0)+"%";
+      progress.appendChild(fill);row.append(line,progress);breakdown.appendChild(row);
+    });
+  }
+}
+function deleteExpense(id){
+  expenses=expenses.filter(e=>e.id!==id);save();render();
+}
+function clearExpenses(){
+  if(confirm("Delete all saved expenses from this browser?")){
+    expenses=[];save();render();
+  }
+}
+function exportCSV(){
+  const rows=[["Date","Description","Category","Type","Amount"]];
+  expenses.forEach(e=>rows.push([e.date,e.description,e.category,e.type,e.amount]));
+  const csv=rows.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\r\n");
+  const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;a.download="SmartExpenseTracker-Report.csv";a.click();
+  URL.revokeObjectURL(url);
+}
+render();
+</script>
+</body>
+</html>
